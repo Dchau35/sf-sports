@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1a1a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SF Sports">
+<meta name="description" content="Résultats SF Giants, 49ers et Golden State Warriors">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>SF Sports</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f0f14;
+    color: #f0f0f0;
+    max-width: 430px;
+    margin: 0 auto;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Layout ── */
+  .screen { display: none; flex-direction: column; height: 100%; overflow: hidden; }
+  .screen.active { display: flex; }
+  .content { flex: 1; overflow-y: auto; padding: 0 14px 16px; -webkit-overflow-scrolling: touch; }
+
+  /* ── Status bar ── */
+  .status-bar {
+    padding: env(safe-area-inset-top, 12px) 18px 0;
+    padding-top: max(env(safe-area-inset-top), 12px);
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: #888; background: #0f0f14;
+  }
+
+  /* ── Top bar ── */
+  .top-bar { padding: 8px 14px 10px; display: flex; align-items: center; gap: 10px; background: #0f0f14; }
+  .back-btn {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #1e1e28; border: none; cursor: pointer;
+    font-size: 16px; display: flex; align-items: center; justify-content: center;
+    color: #f0f0f0; flex-shrink: 0;
+  }
+  .top-title { font-size: 17px; font-weight: 600; color: #f0f0f0; flex: 1; }
+  .top-sub { font-size: 11px; color: #888; }
+
+  /* ── Home header ── */
+  .home-header { padding: 6px 18px 12px; display: flex; justify-content: space-between; align-items: flex-end; background: #0f0f14; }
+  .home-title { font-size: 26px; font-weight: 700; color: #f0f0f0; letter-spacing: -0.5px; }
+  .home-date { font-size: 12px; color: #888; margin-top: 2px; }
+  .lang-btn {
+    font-size: 12px; padding: 5px 12px; border-radius: 14px;
+    background: #1e1e28; border: 1px solid #2e2e3e;
+    cursor: pointer; color: #aaa;
+  }
+
+  /* ── Section label ── */
+  .section-lbl { font-size: 11px; font-weight: 600; color: #666; letter-spacing: 0.07em; text-transform: uppercase; margin: 16px 0 8px; }
+
+  /* ── Team cards (home) ── */
+  .team-card {
+    border-radius: 16px; border: 1px solid #1e1e28;
+    background: #13131a; margin-bottom: 10px;
+    cursor: pointer; overflow: hidden;
+    transition: transform 0.12s, box-shadow 0.12s;
+    -webkit-user-select: none; user-select: none;
+  }
+  .team-card:active { transform: scale(0.975); }
+  .card-header { display: flex; align-items: center; gap: 10px; padding: 12px 14px 8px; }
+  .logo-circle { width: 44px; height: 44px; border-radius: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .team-name { font-size: 14px; font-weight: 600; color: #f0f0f0; }
+  .team-league { font-size: 11px; color: #777; margin-top: 1px; }
+
+  /* ── Badges ── */
+  .badge { font-size: 10px; font-weight: 700; padding: 4px 9px; border-radius: 10px; margin-left: auto; letter-spacing: 0.03em; }
+  .badge-w { background: rgba(34,197,94,0.15); color: #4ade80; }
+  .badge-l { background: rgba(239,68,68,0.15); color: #f87171; }
+  .badge-n { background: rgba(148,163,184,0.12); color: #94a3b8; }
+
+  /* ── Score strip ── */
+  .score-strip { display: flex; align-items: center; justify-content: space-between; background: #0a0a10; margin: 0 10px 10px; border-radius: 11px; padding: 10px 16px; }
+  .score-side { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .score-abbr { font-size: 10px; color: #666; }
+  .score-n { font-size: 30px; font-weight: 700; line-height: 1; }
+  .score-n.w { color: #f0f0f0; }
+  .score-n.l { color: #444; }
+  .score-mid { text-align: center; }
+  .score-status { font-size: 10px; color: #555; }
+  .score-date { font-size: 10px; color: #444; margin-top: 2px; }
+  .score-venue { font-size: 10px; color: #444; text-align: right; padding: 0 14px 10px; }
+
+  /* ── Live indicator ── */
+  .live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #ef4444; margin-right: 4px; animation: blink 1.2s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  /* ── Bottom nav ── */
+  .bottom-nav {
+    display: flex; justify-content: space-around;
+    padding: 8px 0;
+    padding-bottom: max(env(safe-area-inset-bottom, 8px), 8px);
+    border-top: 1px solid #1a1a24;
+    background: #0f0f14; flex-shrink: 0;
+  }
+  .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; font-size: 10px; color: #555; padding: 4px 18px; border-radius: 8px; }
+  .nav-item.on { color: #60a5fa; }
+  .nav-ico { font-size: 18px; }
+
+  /* ── Hero block ── */
+  .hero-box { border-radius: 16px; overflow: hidden; padding: 18px; margin-bottom: 14px; }
+  .hero-row { display: flex; align-items: center; justify-content: space-between; }
+  .hero-team { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .hero-abbr { font-size: 12px; color: rgba(255,255,255,0.5); }
+  .hero-n { font-size: 44px; font-weight: 700; color: #fff; line-height: 1; }
+  .hero-mid { text-align: center; }
+  .hero-status { font-size: 10px; color: rgba(255,255,255,0.35); }
+  .hero-date { font-size: 11px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+  .hero-venue { font-size: 10px; color: rgba(255,255,255,0.3); text-align: center; margin-top: 10px; }
+
+  /* ── Tabs ── */
+  .tab-row { display: flex; gap: 6px; margin-bottom: 12px; }
+  .tab { padding: 5px 13px; border-radius: 14px; font-size: 12px; border: 1px solid #1e1e28; cursor: pointer; color: #666; background: #13131a; }
+  .tab.on { background: rgba(96,165,250,0.15); color: #60a5fa; border-color: rgba(96,165,250,0.3); }
+
+  /* ── Stats grid ── */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 4px; }
+  .stat-box { background: #13131a; border: 1px solid #1e1e28; border-radius: 11px; padding: 10px 12px; }
+  .stat-lbl { font-size: 10px; color: #666; margin-bottom: 3px; }
+  .stat-val { font-size: 17px; font-weight: 600; color: #f0f0f0; }
+  .stat-sub2 { font-size: 10px; color: #555; margin-top: 1px; }
+
+  /* ── Score table (innings/quarters) ── */
+  .score-table-wrap { overflow-x: auto; margin-bottom: 14px; -webkit-overflow-scrolling: touch; }
+  .score-table { font-size: 11px; border-collapse: collapse; min-width: 280px; }
+  .score-table td { padding: 4px 5px; text-align: center; }
+  .st-lbl { text-align: left !important; font-size: 11px; color: #666; min-width: 40px; padding-left: 0 !important; }
+  .st-head { color: #555; font-size: 10px; }
+  .st-sf { color: #f0f0f0; font-weight: 600; }
+  .st-opp { color: #555; }
+  .st-tot { font-weight: 700; color: #f0f0f0; }
+
+  /* ── Mini match rows ── */
+  .mini-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 11px; background: #13131a; border: 1px solid #1a1a24; border-radius: 10px; margin-bottom: 5px; }
+  .mini-date2 { font-size: 11px; color: #666; min-width: 55px; }
+  .mini-matchup { font-size: 12px; color: #ccc; flex: 1; text-align: center; }
+
+  /* ── Standings ── */
+  .stand-wrap { border: 1px solid #1e1e28; border-radius: 11px; overflow: hidden; margin-bottom: 20px; }
+  .stand-head { display: flex; padding: 6px 11px; background: #0a0a10; font-size: 10px; color: #555; }
+  .stand-row { display: flex; align-items: center; padding: 9px 11px; border-top: 1px solid #1a1a24; font-size: 12px; }
+  .s-pos { width: 20px; color: #555; font-size: 11px; }
+  .s-name { flex: 1; color: #ccc; font-weight: 500; }
+  .s-name.hi { color: #60a5fa; font-weight: 600; }
+  .s-w, .s-l, .s-pct { width: 34px; text-align: center; color: #666; }
+
+  /* ── Refresh button ── */
+  .refresh-btn {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: #60a5fa; background: rgba(96,165,250,0.1);
+    border: 1px solid rgba(96,165,250,0.2); border-radius: 10px;
+    padding: 7px 14px; cursor: pointer; margin: 4px 0 14px; width: fit-content;
+  }
+  .refresh-btn:active { opacity: 0.7; }
+
+  /* ── Next game chip ── */
+  .next-chip { display: flex; align-items: center; gap: 8px; background: rgba(96,165,250,0.08); border: 1px solid rgba(96,165,250,0.15); border-radius: 10px; padding: 8px 12px; margin-bottom: 14px; }
+  .next-chip-lbl { font-size: 10px; color: #60a5fa; font-weight: 600; letter-spacing: 0.05em; }
+  .next-chip-val { font-size: 12px; color: #ccc; }
+</style>
+</head>
+<body>
+
+<!-- ══════════ HOME ══════════ -->
+<div class="screen active" id="s-home">
+  <div class="status-bar">
+    <span id="clock-home"></span>
+    <span>SF Sports</span>
+    <span>●●●</span>
+  </div>
+  <div class="home-header">
+    <div>
+      <div class="home-title">SF Sports</div>
+      <div class="home-date" id="home-date"></div>
+    </div>
+    <button class="lang-btn" onclick="toggleLang()">🌐 <span id="lang-toggle-lbl">EN</span></button>
+  </div>
+  <div class="content">
+    <div class="refresh-btn" onclick="refreshData()">
+      <span>↻</span><span id="lbl-refresh">Actualiser les données</span>
+    </div>
+
+    <div class="section-lbl" id="lbl-latest">Derniers matchs</div>
+
+    <!-- Giants -->
+    <div class="team-card" onclick="goDetail('giants')">
+      <div class="card-header">
+        <div class="logo-circle" style="background:#27251F;">
+          <svg width="34" height="24" viewBox="0 0 34 24"><text x="0" y="20" font-size="20" fill="#FD5A1E" font-family="Georgia,serif" font-weight="bold">SF</text></svg>
+        </div>
+        <div><div class="team-name">SF Giants</div><div class="team-league">MLB · NL West</div></div>
+        <span class="badge badge-l" id="badge-giants-home">DÉFAITE</span>
+      </div>
+      <div class="score-strip">
+        <div class="score-side"><div class="score-abbr">SF</div><div class="score-n l">3</div></div>
+        <div class="score-mid">
+          <div class="score-status" id="h-giants-status">FINAL</div>
+          <div class="score-date">4 avr. 2026</div>
+        </div>
+        <div class="score-side"><div class="score-abbr">NYM</div><div class="score-n w">10</div></div>
+      </div>
+      <div class="score-venue">Oracle Park · San Francisco</div>
+    </div>
+
+    <!-- 49ers -->
+    <div class="team-card" onclick="goDetail('49ers')">
+      <div class="card-header">
+        <div class="logo-circle" style="background:#8B0000;">
+          <svg width="42" height="24" viewBox="0 0 42 24"><text x="0" y="20" font-size="14" fill="#B3995D" font-family="Georgia,serif" font-weight="bold">49ers</text></svg>
+        </div>
+        <div><div class="team-name">SF 49ers</div><div class="team-league">NFL · NFC West</div></div>
+        <span class="badge badge-n" id="badge-49ers-home">HORS SAISON</span>
+      </div>
+      <div class="score-strip">
+        <div class="score-side"><div class="score-abbr">V</div><div class="score-n w">10</div></div>
+        <div class="score-mid">
+          <div class="score-status">SAISON 2025</div>
+          <div class="score-date" id="h-49ers-sub">Bilan final</div>
+        </div>
+        <div class="score-side"><div class="score-abbr">D</div><div class="score-n l">7</div></div>
+      </div>
+      <div class="score-venue">Levi's Stadium · Santa Clara</div>
+    </div>
+
+    <!-- Warriors -->
+    <div class="team-card" onclick="goDetail('gsw')">
+      <div class="card-header">
+        <div class="logo-circle" style="background:#1D428A;">
+          <svg width="42" height="24" viewBox="0 0 42 24"><text x="0" y="20" font-size="15" fill="#FFC72C" font-family="-apple-system,sans-serif" font-weight="bold">GSW</text></svg>
+        </div>
+        <div><div class="team-name">Golden State Warriors</div><div class="team-league">NBA · Western Conf.</div></div>
+        <span class="badge badge-l" id="badge-gsw-home">DÉFAITE</span>
+      </div>
+      <div class="score-strip">
+        <div class="score-side"><div class="score-abbr">GSW</div><div class="score-n l">111</div></div>
+        <div class="score-mid">
+          <div class="score-status" id="h-gsw-status">FINAL</div>
+          <div class="score-date">3 avr. 2026</div>
+        </div>
+        <div class="score-side"><div class="score-abbr">CLE</div><div class="score-n w">118</div></div>
+      </div>
+      <div class="score-venue">Chase Center · San Francisco</div>
+    </div>
+  </div>
+  <div class="bottom-nav">
+    <div class="nav-item on"><span class="nav-ico">⚡</span><span id="nav-results">Résultats</span></div>
+    <div class="nav-item"><span class="nav-ico">📅</span><span id="nav-schedule">Calendrier</span></div>
+    <div class="nav-item"><span class="nav-ico">🏆</span><span id="nav-standings">Classements</span></div>
+  </div>
+</div>
+
+<!-- ══════════ GIANTS DETAIL ══════════ -->
+<div class="screen" id="s-giants">
+  <div class="status-bar"><span id="clock-giants"></span><span>SF Giants</span><span>●●●</span></div>
+  <div class="top-bar">
+    <button class="back-btn" onclick="goHome()">←</button>
+    <div style="flex:1"><div class="top-title">SF Giants</div><div class="top-sub">MLB · NL West</div></div>
+    <div class="logo-circle" style="background:#27251F;width:34px;height:34px;">
+      <svg width="26" height="18" viewBox="0 0 34 24"><text x="0" y="20" font-size="20" fill="#FD5A1E" font-family="Georgia,serif" font-weight="bold">SF</text></svg>
+    </div>
+  </div>
+  <div class="content">
+
+    <div class="hero-box" style="background:linear-gradient(135deg,#1a1208 0%,#27251F 100%);">
+      <div class="hero-row">
+        <div class="hero-team"><div class="hero-abbr">SF Giants</div><div class="hero-n">3</div></div>
+        <div class="hero-mid">
+          <div class="hero-status">FINAL</div>
+          <div class="hero-date">4 avr. 2026</div>
+        </div>
+        <div class="hero-team"><div class="hero-abbr">NY Mets</div><div class="hero-n" style="color:#f87171;">10</div></div>
+      </div>
+      <div class="hero-venue">Oracle Park · San Francisco</div>
+    </div>
+
+    <!-- Next game -->
+    <div class="next-chip">
+      <span style="font-size:16px;">📅</span>
+      <div><div class="next-chip-lbl" id="g-next-lbl">PROCHAIN MATCH</div><div class="next-chip-val">SF vs NYM — Dim. 5 avr. 03h05 CEST</div></div>
+    </div>
+
+    <div class="section-lbl" id="g-innings-lbl">Score par manche</div>
+    <div class="score-table-wrap">
+      <table class="score-table">
+        <tr>
+          <td class="st-lbl"></td>
+          <td class="st-head">1</td><td class="st-head">2</td><td class="st-head">3</td>
+          <td class="st-head">4</td><td class="st-head">5</td><td class="st-head">6</td>
+          <td class="st-head">7</td><td class="st-head">8</td><td class="st-head">9</td>
+          <td class="st-head" style="font-weight:600;">R</td><td class="st-head">H</td><td class="st-head">E</td>
+        </tr>
+        <tr>
+          <td class="st-lbl">SF</td>
+          <td class="st-sf">0</td><td class="st-sf">0</td><td class="st-sf">0</td>
+          <td class="st-sf">0</td><td class="st-sf">0</td><td class="st-sf">2</td>
+          <td class="st-sf">0</td><td class="st-sf">1</td><td class="st-sf">0</td>
+          <td class="st-tot">3</td><td class="st-sf">5</td><td class="st-sf">0</td>
+        </tr>
+        <tr>
+          <td class="st-lbl">NYM</td>
+          <td class="st-opp">2</td><td class="st-opp">0</td><td class="st-opp">0</td>
+          <td class="st-opp">3</td><td class="st-opp">0</td><td class="st-opp">0</td>
+          <td class="st-opp">3</td><td class="st-opp">0</td><td class="st-opp">2</td>
+          <td class="st-tot">10</td><td class="st-opp">15</td><td class="st-opp">0</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="section-lbl" id="g-stats-lbl">Statistiques clés</div>
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-lbl" id="g-s1-lbl">Lanceur défaite</div>
+        <div class="stat-val" style="font-size:14px;">T. Mahle</div>
+        <div class="stat-sub2">0-2 · ERA 9.00 · 5 IP</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-lbl" id="g-s2-lbl">Lanceur victoire</div>
+        <div class="stat-val" style="font-size:14px;">N. McLean</div>
+        <div class="stat-sub2">1-0 · ERA 1.69 · 5.1 IP</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-lbl" id="g-s3-lbl">Moyenne SF</div>
+        <div class="stat-val">.156</div>
+        <div class="stat-sub2">5 hits / 32 AB</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-lbl" id="g-s4-lbl">HR adverses</div>
+        <div class="stat-val">2</div>
+        <div class="stat-sub2">F. Alvarez ×2</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-lbl" id="g-s5-lbl">Meilleur frappeur</div>
+        <div class="stat-val" style="font-size:14px;">H. Ramos</div>
+        <div class="stat-sub2">2/4 — seul SF &gt; 1 hit</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-lbl">OPS SF</div>
+        <div class="stat-val">.448</div>
+        <div class="stat-sub2">OBP .229 · SLG .219</div>
+      </div>
+    </div>
+
+    <div class="section-lbl" id="g-last3-lbl">3 derniers matchs</div>
+    <div class="mini-row"><div class="mini-date2">4 avr.</div><div class="mini-matchup">SF vs NYM</div><span class="badge badge-l">3–10</span></div>
+    <div class="mini-row"><div class="mini-date2">3 avr.</div><div class="mini-matchup">SF vs NYM</div><span class="badge badge-w">7–2</span></div>
+    <div class="mini-row"><div class="mini-date2">1 avr.</div><div class="mini-matchup">SD vs SF</div><span class="badge badge-l">1–7</span></div>
+
+    <div class="section-lbl" id="g-standing-lbl">Classement NL West</div>
+    <div class="stand-wrap">
+      <div class="stand-head"><span class="s-pos">#</span><span style="flex:1" id="g-col-team">Équipe</span><span class="s-w">V</span><span class="s-l">D</span><span class="s-pct">PCT</span></div>
+      <div class="stand-row"><span class="s-pos">1</span><span class="s-name">LA Dodgers</span><span class="s-w">5</span><span class="s-l">2</span><span class="s-pct">.714</span></div>
+      <div class="stand-row"><span class="s-pos">2</span><span class="s-name">AZ D-backs</span><span class="s-w">3</span><span class="s-l">5</span><span class="s-pct">.375</span></div>
+      <div class="stand-row"><span class="s-pos">3</span><span class="s-name hi">SF Giants</span><span class="s-w">3</span><span class="s-l">5</span><span class="s-pct">.375</span></div>
+      <div class="stand-row"><span class="s-pos">4</span><span class="s-name">COL Rockies</span><span class="s-w">2</span><span class="s-l">5</span><span class="s-pct">.286</span></div>
+      <div class="stand-row"><span class="s-pos">5</span><span class="s-name">SD Padres</span><span class="s-w">2</span><span class="s-l">5</span><span class="s-pct">.286</span></div>
+    </div>
+  </div>
+  <div class="bottom-nav">
+    <div class="nav-item on"><span class="nav-ico">⚡</span><span>Résultats</span></div>
+    <div class="nav-item"><span class="nav-ico">📅</span><span>Calendrier</span></div>
+    <div class="nav-item"><span class="nav-ico">🏆</span><span>Classements</span></div>
+  </div>
+</div>
+
+<!-- ══════════ 49ERS DETAIL ══════════ -->
+<div class="screen" id="s-49ers">
+  <div class="status-bar"><span id="clock-49ers"></span><span>SF 49ers</span><span>●●●</span></div>
+  <div class="top-bar">
+    <button class="back-btn" onclick="goHome()">←</button>
+    <div style="flex:1"><div class="top-title">SF 49ers</div><div class="top-sub">NFL · NFC West</div></div>
+    <div class="logo-circle" style="background:#8B0000;width:34px;height:34px;">
+      <svg width="34" height="18" viewBox="0 0 42 24"><text x="0" y="20" font-size="14" fill="#B3995D" font-family="Georgia,serif" font-weight="bold">49ers</text></svg>
+    </div>
+  </div>
+  <div class="content">
+
+    <div class="hero-box" style="background:linear-gradient(135deg,#1a0000 0%,#6b0000 100%);">
+      <div class="hero-row">
+        <div class="hero-team"><div class="hero-abbr">SF 49ers</div><div class="hero-n" style="font-size:36px;">10–7</div></div>
+        <div class="hero-mid">
+          <div class="hero-status">BILAN 2025</div>
+          <div class="hero-date" id="f-offseason">Hors saison</div>
+        </div>
+        <div class="hero-team"><div class="hero-abbr">NFC West</div><div class="hero-n" style="font-size:36px;">2e</div></div>
+      </div>
+      <div class="hero-venue" id="f-next-season">Prochaine saison : sept. 2026</div>
+    </div>
+
+    <!-- Next season chip -->
+    <div class="next-chip">
+      <span style="font-size:16px;">🏈</span>
+      <div><div class="next-chip-lbl" id="f-next-lbl">PROCHAINE SAISON</div><div class="next-chip-val" id="f-next-val">Draft NFL — Avril 2026 · Training camp — Juillet 2026</div></div>
+    </div>
+
+    <div class="section-lbl" id="f-season-lbl">Bilan saison 2025</div>
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-lbl" id="f-s1-lbl">Bilan</div>
+        <div class="stat-val">10–7</div>
+        <div class="stat-sub2" id="f-s1-sub">Saison régulière</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-lbl" id="f-s2-lbl">Division</div>
+        <div class="stat-val">2e</div>
+        <div class="stat-sub2">NFC West</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-lbl">Playoffs</div>
+        <div class="stat-val" style="font-size:14px;" id="f-elim">Éliminés</div>
+        <div class="stat-sub2">Wild Card</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-lbl">QB</div>
+        <div class="stat-val" style="font-size:14px;">B. Purdy</div>
+        <div class="stat-sub2">3864 yds · 25 TD</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-lbl" id="f-s5-lbl">Rushing leader</div>
+        <div class="stat-val" style="font-size:14px;">C. McCaffrey</div>
+        <div class="stat-sub2">1459 yds · 14 TD</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-lbl" id="f-s6-lbl">Sacks défense</div>
+        <div class="stat-val">47</div>
+        <div class="stat-sub2">N. Bosa leader</div>
+      </div>
+    </div>
+
+    <div class="section-lbl" id="f-last3-lbl">3 derniers matchs 2025</div>
+    <div class="mini-row"><div class="mini-date2">S17</div><div class="mini-matchup">SF vs SEA</div><span class="badge badge-w">24–17</span></div>
+    <div class="mini-row"><div class="mini-date2">S16</div><div class="mini-matchup">SF vs ARI</div><span class="badge badge-w">30–13</span></div>
+    <div class="mini-row"><div class="mini-date2">S15</div><div class="mini-matchup">DAL vs SF</div><span class="badge badge-l">21–27</span></div>
+
+    <div class="section-lbl" id="f-standing-lbl">Classement NFC West 2025</div>
+    <div class="stand-wrap">
+      <div class="stand-head"><span class="s-pos">#</span><span style="flex:1" id="f-col-team">Équipe</span><span class="s-w">V</span><span class="s-l">D</span><span class="s-pct">PCT</span></div>
+      <div class="stand-row"><span class="s-pos">1</span><span class="s-name">LA Rams</span><span class="s-w">12</span><span class="s-l">5</span><span class="s-pct">.706</span></div>
+      <div class="stand-row"><span class="s-pos">2</span><span class="s-name hi">SF 49ers</span><span class="s-w">10</span><span class="s-l">7</span><span class="s-pct">.588</span></div>
+      <div class="stand-row"><span class="s-pos">3</span><span class="s-name">SEA Seahawks</span><span class="s-w">10</span><span class="s-l">7</span><span class="s-pct">.588</span></div>
+      <div class="stand-row"><span class="s-pos">4</span><span class="s-name">ARI Cardinals</span><span class="s-w">8</span><span class="s-l">9</span><span class="s-pct">.471</span></div>
+    </div>
+  </div>
+  <div class="bottom-nav">
+    <div class="nav-item on"><span class="nav-ico">⚡</span><span>Résultats</span></div>
+    <div class="nav-item"><span class="nav-ico">📅</span><span>Calendrier</span></div>
+    <div class="nav-item"><span class="nav-ico">🏆</span><span>Classements</span></div>
+  </div>
+</div>
+
+<!-- ══════════ WARRIORS DETAIL ══════════ -->
+<div class="screen" id="s-gsw">
+  <div class="status-bar"><span id="clock-gsw"></span><span>Warriors</span><span>●●●</span></div>
+  <div class="top-bar">
+    <button class="back-btn" onclick="goHome()">←</button>
+    <div style="flex:1"><div class="top-title">Golden State Warriors</div><div class="top-sub">NBA · Western Conf.</div></div>
+    <div class="logo-circle" style="background:#1D428A;width:34px;height:34px;">
+      <svg width="36" height="18" viewBox="0 0 42 24"><text x="0" y="20" font-size="15" fill="#FFC72C" font-family="-apple-system,sans-serif" font-weight="bold">GSW</text></svg>
+    </div>
+  </div>
+  <div class="content">
+
+    <div class="hero-box" style="background:linear-gradient(135deg,#060e1f 0%,#1D428A 100%);">
+      <div class="hero-row">
+        <div class="hero-team"><div class="hero-abbr">Warriors</div><div class="hero-n">111</div></div>
+        <div class="hero-mid">
+          <div class="hero-status">FINAL</div>
+          <div class="hero-date">3 avr. 2026</div>
+        </div>
+        <div class="hero-team"><div class="hero-abbr">Cavaliers</div><div class="hero-n" style="color:#fbbf24;">118</div></div>
+      </div>
+      <div class="hero-venue">Chase Center · San Francisco</div>
+    </div>
+
+    <!-- Next game -->
+    <div class="next-chip">
+      <span style="font-size:16px;">📅</span>
+      <div><div class="next-chip-lbl" id="w-next-lbl">PROCHAIN MATCH</div><div class="next-chip-val">GSW vs HOU — Lun. 6 avr. 04h00 CEST</div></div>
+    </div>
+
+    <div class="section-lbl" id="w-quarters-lbl">Score par quart-temps</div>
+    <div class="score-table-wrap">
+      <table class="score-table">
+        <tr>
+          <td class="st-lbl"></td>
+          <td class="st-head">Q1</td><td class="st-head">Q2</td><td class="st-head">Q3</td><td class="st-head">Q4</td>
+          <td class="st-head" style="font-weight:600;">TOT</td>
+        </tr>
+        <tr>
+          <td class="st-lbl">GSW</td>
+          <td class="st-sf">26</td><td class="st-sf">21</td><td class="st-sf">33</td><td class="st-sf">31</td>
+          <td class="st-tot">111</td>
+        </tr>
+        <tr>
+          <td class="st-lbl">CLE</td>
+          <td class="st-opp">30</td><td class="st-opp">24</td><td class="st-opp">30</td><td class="st-opp">34</td>
+          <td class="st-tot">118</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="section-lbl" id="w-stats-lbl">Statistiques clés</div>
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-lbl" id="w-s1-lbl">Meilleur marqueur</div>
+        <div class="stat-val" style="font-size:14px;">G. Santos</div>
+        <div class="stat-sub2">25 pts · 64% FG</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-lbl" id="w-s2-lbl">Passes décisives</div>
+        <div class="stat-val" style="font-size:14px;">D. Green</div>
+        <div class="stat-sub2">9 ast · 9 reb · 3 blk</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-lbl" id="w-s3-lbl">Tirs à 3 points</div>
+        <div class="stat-val">12/44</div>
+        <div class="stat-sub2">27.3%</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-lbl" id="w-s4-lbl">Adresse au tir</div>
+        <div class="stat-val">43.6%</div>
+        <div class="stat-sub2">vs 51.2% CLE</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-lbl" id="w-s5-lbl">Rebonds</div>
+        <div class="stat-val">52</div>
+        <div class="stat-sub2" id="w-s5-sub">12 offensifs</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-lbl" id="w-s6-lbl">Contres</div>
+        <div class="stat-val">5</div>
+        <div class="stat-sub2">D. Green ×3</div>
+      </div>
+    </div>
+
+    <div class="section-lbl" id="w-last3-lbl">3 derniers matchs</div>
+    <div class="mini-row"><div class="mini-date2">3 avr.</div><div class="mini-matchup">GSW vs CLE</div><span class="badge badge-l">111–118</span></div>
+    <div class="mini-row"><div class="mini-date2">2 avr.</div><div class="mini-matchup">GSW vs SAS</div><span class="badge badge-l">113–127</span></div>
+    <div class="mini-row"><div class="mini-date2">30 mar.</div><div class="mini-matchup">DEN vs GSW</div><span class="badge badge-l">93–116</span></div>
+
+    <div class="section-lbl" id="w-standing-lbl">Classement Western Conf. · Pacific</div>
+    <div class="stand-wrap">
+      <div class="stand-head"><span class="s-pos">#</span><span style="flex:1" id="w-col-team">Équipe</span><span class="s-w">V</span><span class="s-l">D</span><span class="s-pct">PCT</span></div>
+      <div class="stand-row"><span class="s-pos">1</span><span class="s-name">LA Lakers</span><span class="s-w">50</span><span class="s-l">27</span><span class="s-pct">.649</span></div>
+      <div class="stand-row"><span class="s-pos">2</span><span class="s-name">PHX Suns</span><span class="s-w">42</span><span class="s-l">35</span><span class="s-pct">.545</span></div>
+      <div class="stand-row"><span class="s-pos">3</span><span class="s-name">LA Clippers</span><span class="s-w">39</span><span class="s-l">38</span><span class="s-pct">.506</span></div>
+      <div class="stand-row"><span class="s-pos">4</span><span class="s-name hi">GSW Warriors</span><span class="s-w">36</span><span class="s-l">41</span><span class="s-pct">.468</span></div>
+      <div class="stand-row"><span class="s-pos">5</span><span class="s-name">SAC Kings</span><span class="s-w">21</span><span class="s-l">57</span><span class="s-pct">.269</span></div>
+    </div>
+  </div>
+  <div class="bottom-nav">
+    <div class="nav-item on"><span class="nav-ico">⚡</span><span>Résultats</span></div>
+    <div class="nav-item"><span class="nav-ico">📅</span><span>Calendrier</span></div>
+    <div class="nav-item"><span class="nav-ico">🏆</span><span>Classements</span></div>
+  </div>
+</div>
+
+<script>
+// ── Language ──
+var lang = 'fr';
+var T = {
+  fr: {
+    refresh: 'Actualiser les données', latest: 'Derniers matchs',
+    results: 'Résultats', schedule: 'Calendrier', standings: 'Classements',
+    defaite: 'DÉFAITE', victoire: 'VICTOIRE', horsSaison: 'HORS SAISON',
+    final: 'FINAL', saison2025: 'SAISON 2025', bilanFinal: 'Bilan final',
+    nextGame: 'PROCHAIN MATCH', nextSeason: 'PROCHAINE SAISON',
+    gInnings: 'Score par manche', gStats: 'Statistiques clés',
+    gLoss: 'Lanceur défaite', gWin: 'Lanceur victoire', gAvg: 'Moyenne SF',
+    gHR: 'HR adverses', gBest: 'Meilleur frappeur',
+    gLast3: '3 derniers matchs', gStand: 'Classement NL West', team: 'Équipe',
+    fSeason: 'Bilan saison 2025', fBilan: 'Bilan', fDivision: 'Division',
+    fElim: 'Éliminés', fRushing: 'Rushing leader', fSacks: 'Sacks défense',
+    fLast3: '3 derniers matchs 2025', fStand: 'Classement NFC West 2025',
+    fOffseason: 'Hors saison', fNextSeason: 'Prochaine saison : sept. 2026',
+    fNextLbl: 'PROCHAINE SAISON', fNextVal: 'Draft NFL — Avril 2026 · Training camp — Juillet 2026',
+    wQuarters: 'Score par quart-temps', wStats: 'Statistiques clés',
+    wScorer: 'Meilleur marqueur', wAssists: 'Passes décisives',
+    w3pt: 'Tirs à 3 points', wFG: 'Adresse au tir',
+    wReb: 'Rebonds', wOffReb: '12 offensifs', wBlocks: 'Contres',
+    wLast3: '3 derniers matchs', wStand: 'Classement Western Conf. · Pacific',
+    fRegSeason: 'Saison régulière'
+  },
+  en: {
+    refresh: 'Refresh data', latest: 'Latest results',
+    results: 'Results', schedule: 'Schedule', standings: 'Standings',
+    defaite: 'LOSS', victoire: 'WIN', horsSaison: 'OFF-SEASON',
+    final: 'FINAL', saison2025: '2025 SEASON', bilanFinal: 'Final record',
+    nextGame: 'NEXT GAME', nextSeason: 'NEXT SEASON',
+    gInnings: 'Scoring by inning', gStats: 'Key stats',
+    gLoss: 'Losing pitcher', gWin: 'Winning pitcher', gAvg: 'SF batting avg.',
+    gHR: 'Opp. home runs', gBest: 'Top batter',
+    gLast3: 'Last 3 games', gStand: 'NL West standings', team: 'Team',
+    fSeason: '2025 season stats', fBilan: 'Record', fDivision: 'Division',
+    fElim: 'Eliminated', fRushing: 'Rushing leader', fSacks: 'Defense sacks',
+    fLast3: 'Last 3 games 2025', fStand: 'NFC West standings 2025',
+    fOffseason: 'Off-season', fNextSeason: 'Next season: Sept. 2026',
+    fNextLbl: 'NEXT SEASON', fNextVal: 'NFL Draft — April 2026 · Training camp — July 2026',
+    wQuarters: 'Scoring by quarter', wStats: 'Key stats',
+    wScorer: 'Top scorer', wAssists: 'Most assists',
+    w3pt: '3-point shooting', wFG: 'Field goal %',
+    wReb: 'Rebounds', wOffReb: '12 offensive', wBlocks: 'Blocks',
+    wLast3: 'Last 3 games', wStand: 'Western Conf. standings · Pacific',
+    fRegSeason: 'Regular season'
+  }
+};
+
+function applyLang() {
+  var t = T[lang];
+  document.getElementById('lang-toggle-lbl').textContent = lang === 'fr' ? 'EN' : 'FR';
+  document.getElementById('lbl-refresh').textContent = t.refresh;
+  document.getElementById('lbl-latest').textContent = t.latest;
+  document.getElementById('nav-results').textContent = t.results;
+  document.getElementById('nav-schedule').textContent = t.schedule;
+  document.getElementById('nav-standings').textContent = t.standings;
+  document.getElementById('badge-giants-home').textContent = t.defaite;
+  document.getElementById('badge-gsw-home').textContent = t.defaite;
+  document.getElementById('badge-49ers-home').textContent = t.horsSaison;
+  document.getElementById('h-giants-status').textContent = t.final;
+  document.getElementById('h-gsw-status').textContent = t.final;
+  document.getElementById('h-49ers-sub').textContent = t.bilanFinal;
+  // Giants detail
+  document.getElementById('g-next-lbl').textContent = t.nextGame;
+  document.getElementById('g-innings-lbl').textContent = t.gInnings;
+  document.getElementById('g-stats-lbl').textContent = t.gStats;
+  document.getElementById('g-s1-lbl').textContent = t.gLoss;
+  document.getElementById('g-s2-lbl').textContent = t.gWin;
+  document.getElementById('g-s3-lbl').textContent = t.gAvg;
+  document.getElementById('g-s4-lbl').textContent = t.gHR;
+  document.getElementById('g-s5-lbl').textContent = t.gBest;
+  document.getElementById('g-last3-lbl').textContent = t.gLast3;
+  document.getElementById('g-standing-lbl').textContent = t.gStand;
+  document.getElementById('g-col-team').textContent = t.team;
+  // 49ers detail
+  document.getElementById('f-offseason').textContent = t.fOffseason;
+  document.getElementById('f-next-season').textContent = t.fNextSeason;
+  document.getElementById('f-next-lbl').textContent = t.fNextLbl;
+  document.getElementById('f-next-val').textContent = t.fNextVal;
+  document.getElementById('f-season-lbl').textContent = t.fSeason;
+  document.getElementById('f-s1-lbl').textContent = t.fBilan;
+  document.getElementById('f-s1-sub').textContent = t.fRegSeason;
+  document.getElementById('f-s2-lbl').textContent = t.fDivision;
+  document.getElementById('f-elim').textContent = t.fElim;
+  document.getElementById('f-s5-lbl').textContent = t.fRushing;
+  document.getElementById('f-s6-lbl').textContent = t.fSacks;
+  document.getElementById('f-last3-lbl').textContent = t.fLast3;
+  document.getElementById('f-standing-lbl').textContent = t.fStand;
+  document.getElementById('f-col-team').textContent = t.team;
+  // Warriors detail
+  document.getElementById('w-next-lbl').textContent = t.nextGame;
+  document.getElementById('w-quarters-lbl').textContent = t.wQuarters;
+  document.getElementById('w-stats-lbl').textContent = t.wStats;
+  document.getElementById('w-s1-lbl').textContent = t.wScorer;
+  document.getElementById('w-s2-lbl').textContent = t.wAssists;
+  document.getElementById('w-s3-lbl').textContent = t.w3pt;
+  document.getElementById('w-s4-lbl').textContent = t.wFG;
+  document.getElementById('w-s5-lbl').textContent = t.wReb;
+  document.getElementById('w-s5-sub').textContent = t.wOffReb;
+  document.getElementById('w-s6-lbl').textContent = t.wBlocks;
+  document.getElementById('w-last3-lbl').textContent = t.wLast3;
+  document.getElementById('w-standing-lbl').textContent = t.wStand;
+  document.getElementById('w-col-team').textContent = t.team;
+  updateDate();
+}
+
+function toggleLang() { lang = lang === 'fr' ? 'en' : 'fr'; applyLang(); }
+
+// ── Date & Clock ──
+function updateDate() {
+  var d = new Date();
+  var days_fr = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+  var months_fr = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  var days_en = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var months_en = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var el = document.getElementById('home-date');
+  if(lang === 'fr') {
+    el.textContent = days_fr[d.getDay()] + ' ' + d.getDate() + ' ' + months_fr[d.getMonth()] + ' ' + d.getFullYear();
+  } else {
+    el.textContent = days_en[d.getDay()] + ', ' + months_en[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+  }
+}
+function updateClocks() {
+  var now = new Date();
+  var h = now.getHours().toString().padStart(2,'0');
+  var m = now.getMinutes().toString().padStart(2,'0');
+  var t = h + ':' + m;
+  ['home','giants','49ers','gsw'].forEach(function(id) {
+    var el = document.getElementById('clock-' + id);
+    if(el) el.textContent = t;
+  });
+}
+setInterval(updateClocks, 10000);
+updateClocks();
+updateDate();
+
+// ── Navigation ──
+function goDetail(team) {
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+  document.getElementById('s-' + team).classList.add('active');
+  window.scrollTo(0,0);
+}
+function goHome() {
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+  document.getElementById('s-home').classList.add('active');
+}
+
+// ── Refresh (feedback visuel) ──
+function refreshData() {
+  var btn = document.querySelector('.refresh-btn');
+  var lbl = document.getElementById('lbl-refresh');
+  btn.style.opacity = '0.5';
+  lbl.textContent = lang === 'fr' ? 'Actualisation...' : 'Refreshing...';
+  setTimeout(function() {
+    btn.style.opacity = '1';
+    lbl.textContent = lang === 'fr' ? '✓ Données à jour' : '✓ Up to date';
+    setTimeout(function() {
+      lbl.textContent = T[lang].refresh;
+    }, 2000);
+  }, 1200);
+}
+
+// ── Service Worker registration ──
+if('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js').catch(function(e){ console.log('SW:', e); });
+  });
+}
+</script>
+</body>
+</html>
